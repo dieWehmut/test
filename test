@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek · 莱茵生命风格启动动画</title>
+<style>
+  :root {
+    --accent: #ff7500;
+    --ink: #141414;
+    --paper: #f3ede3;
+    --paper-deep: #eae2d4;
+    --line: rgba(20, 20, 20, 0.28);
+    --glitch-a: #ff3b30;
+    --glitch-b: #2971b8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  body {
+    font-family: "HarmonyOS Sans SC", "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: var(--ink);
+    user-select: none;
+  }
+  .mono {
+    font-family: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+    letter-spacing: 0.12em;
+  }
+
+  /* ============ 舞台 ============ */
+  #stage { position: fixed; inset: 0; }
+
+  /* ============ 第一幕：黑幕标识 ============ */
+  .scene-black {
+    position: absolute; inset: 0; background: #050505;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 26px; z-index: 30;
+    transition: opacity 0.45s ease;
+  }
+  .scene-black.hide { opacity: 0; pointer-events: none; }
+  .whale-mark { width: 190px; height: 118px; opacity: 0; transform: scale(0.86); }
+  .scene-black.play .whale-mark {
+    animation: markIn 1.2s cubic-bezier(.2,.8,.25,1) forwards,
+               markGlow 2.6s ease-in-out 0.9s infinite;
+  }
+  @keyframes markIn {
+    0%   { opacity: 0; transform: scale(0.86) translateY(10px); filter: blur(6px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); filter: blur(0); }
+  }
+  @keyframes markGlow {
+    0%, 100% { filter: drop-shadow(0 0 6px rgba(255,255,255,0.15)); }
+    50%      { filter: drop-shadow(0 0 22px rgba(255,255,255,0.55)); }
+  }
+  .black-caption { color: #cfcac0; font-size: 13px; opacity: 0; }
+  .scene-black.play .black-caption { animation: capIn 0.8s ease 0.7s forwards; }
+  @keyframes capIn { to { opacity: 0.85; } }
+  .flash {
+    position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 40; pointer-events: none;
+  }
+  .flash.go { animation: flashGo 0.55s ease forwards; }
+  @keyframes flashGo {
+    0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 1; }
+  }
+
+  /* ============ 第二幕：莱茵档案板 ============ */
+  .scene-board {
+    position: absolute; inset: 0; background:
+      radial-gradient(1200px 700px at 70% 20%, #faf6ee 0%, var(--paper) 55%, var(--paper-deep) 100%);
+    opacity: 0; z-index: 20;
+    transition: opacity 0.4s ease;
+  }
+  .scene-board.show { opacity: 1; }
+  /* 网格底纹 */
+  .scene-board::before {
+    content: ""; position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    opacity: 0.12;
+    mask-image: radial-gradient(ellipse at center, #000 30%, transparent 85%);
+  }
+  /* 顶部与底部结构线 */
+  .frame-line { position: absolute; background: var(--ink); opacity: 0.75; }
+  .fl-top    { top: 64px; left: 48px; right: 48px; height: 1px; }
+  .fl-bottom { bottom: 84px; left: 48px; right: 48px; height: 1px; }
+
+  /* 四角 HUD */
+  .hud { position: absolute; font-size: 10px; color: var(--ink); opacity: 0.6; letter-spacing: 0.22em; }
+  .hud-tl { top: 30px; left: 48px; }
+  .hud-tr { top: 30px; right: 48px; text-align: right; }
+  .hud-bl { bottom: 30px; left: 48px; }
+  .hud-br { bottom: 30px; right: 48px; text-align: right; }
+  .hud b { color: var(--accent); font-weight: 700; }
+
+  /* 品牌铭牌 */
+  .brand { position: absolute; top: 22px; left: 48px; display: flex; align-items: center; gap: 12px; }
+  .brand svg { width: 34px; height: 34px; }
+  .brand-name { display: flex; flex-direction: column; gap: 2px; }
+  .brand-cn { font-size: 15px; font-weight: 700; letter-spacing: 0.4em; }
+  .brand-en { font-size: 9px; opacity: 0.55; letter-spacing: 0.3em; }
+
+  /* 跳过按钮 */
+  .skip {
+    position: absolute; top: 22px; right: 48px; z-index: 60;
+    font-size: 11px; letter-spacing: 0.2em;
+    border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    padding: 7px 16px; cursor: pointer; opacity: 0.65; transition: 0.2s;
+  }
+  .skip:hover { opacity: 1; background: var(--ink); color: var(--paper); }
+
+  /* 中央环形准星 */
+  .reticle {
+    position: absolute; top: 50%; left: 50%; width: 340px; height: 340px;
+    transform: translate(-50%, -50%); pointer-events: none;
+  }
+  .reticle .ring {
+    position: absolute; inset: 0; border-radius: 50%;
+    border: 1.5px dashed rgba(20,20,20,0.5);
+    animation: spin 26s linear infinite;
+  }
+  .reticle .ring2 {
+    position: absolute; inset: 26px; border-radius: 50%;
+    border: 1px solid rgba(20,20,20,0.35);
+    animation: spinRev 18s linear infinite;
+  }
+  .reticle .ring3 {
+    position: absolute; inset: 54px; border-radius: 50%;
+    border: 1.5px solid rgba(255,117,0,0.55);
+    border-bottom-color: transparent;
+    animation: spin 10s linear infinite;
+  }
+  .reticle .tick {
+    position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+    background: var(--accent); transform: translate(-50%,-50%) rotate(45deg);
+  }
+  @keyframes spin    { to { transform: rotate(360deg); } }
+  @keyframes spinRev { to { transform: rotate(-360deg); } }
+
+  /* 中央文字区 */
+  .center-col {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 18px; z-index: 25;
+  }
+  .step-cn {
+    font-size: 34px; font-weight: 800; letter-spacing: 0.3em; text-indent: 0.3em;
+    min-height: 44px;
+  }
+  .step-en {
+    font-size: 12px; opacity: 0.55; min-height: 16px; letter-spacing: 0.3em;
+  }
+  .caret { display: inline-block; width: 12px; height: 30px; background: var(--accent);
+    vertical-align: -4px; margin-left: 6px; animation: blink 0.8s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* 阶段条 */
+  .stage-bar {
+    position: absolute; bottom: 108px; right: 48px; display: flex; align-items: center; gap: 14px;
+    font-size: 10px; letter-spacing: 0.25em; opacity: 0.75;
+  }
+  .stage-node { display: flex; align-items: center; gap: 8px; }
+  .stage-dot { width: 8px; height: 8px; border: 1px solid var(--ink); transform: rotate(45deg); }
+  .stage-node.active .stage-dot { background: var(--accent); border-color: var(--accent); }
+  .stage-node.active { color: var(--accent); font-weight: 700; }
+  .stage-link { width: 46px; height: 1px; background: var(--ink); opacity: 0.4; }
+
+  /* 日志区 */
+  .log-area {
+    position: absolute; bottom: 108px; left: 48px; width: 340px;
+    font-size: 10px; line-height: 1.9; opacity: 0.7; letter-spacing: 0.1em;
+  }
+  .log-area .log-line { white-space: nowrap; overflow: hidden; }
+  .log-area .ok { color: var(--accent); }
+
+  /* 进度读数 */
+  .readout {
+    position: absolute; top: 96px; right: 48px; text-align: right;
+    font-size: 30px; font-weight: 700; letter-spacing: 0.06em; opacity: 0.85;
+  }
+  .readout small { display: block; font-size: 9px; letter-spacing: 0.3em; opacity: 0.6; margin-top: 4px; }
+
+  /* 确认按钮 */
+  .confirm-btn {
+    margin-top: 10px; font-size: 13px; letter-spacing: 0.35em; text-indent: 0.35em;
+    padding: 12px 34px; border: 1px solid var(--ink); background: var(--ink); color: var(--paper);
+    cursor: pointer; transition: 0.15s; position: relative;
+  }
+  .confirm-btn:hover { background: var(--accent); border-color: var(--accent); }
+  .confirm-btn::after {
+    content: ""; position: absolute; inset: 4px; border: 1px dashed rgba(243,237,227,0.4); pointer-events: none;
+  }
+  .hidden { display: none !important; }
+
+  /* 身份卡 */
+  .id-card {
+    display: flex; gap: 0; border: 1px solid var(--ink); background: rgba(255,255,255,0.5);
+    box-shadow: 6px 6px 0 rgba(20,20,20,0.12); margin-top: 8px;
+  }
+  .id-left {
+    background: var(--ink); color: var(--paper); padding: 16px 20px;
+    display: flex; align-items: center; justify-content: center;
+    writing-mode: vertical-rl; font-size: 13px; letter-spacing: 0.5em; font-weight: 700;
+  }
+  .id-right { padding: 14px 22px; display: flex; flex-direction: column; gap: 8px; min-width: 240px; }
+  .id-row { display: flex; justify-content: space-between; font-size: 12px; gap: 24px; }
+  .id-row .k { opacity: 0.55; letter-spacing: 0.2em; }
+  .id-row .v { font-weight: 700; letter-spacing: 0.1em; }
+  .id-row .v.hl { color: var(--accent); }
+
+  /* 故障揭幕遮罩 */
+  .glitch-mask { position: absolute; inset: 0; z-index: 50; pointer-events: none; opacity: 0; }
+  .glitch-mask.go { animation: glitchGo 0.7s steps(6) forwards; }
+  @keyframes glitchGo {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .g-slice { position: absolute; left: 0; right: 0; background: var(--paper); }
+  .g-slice.a { background: var(--glitch-a); mix-blend-mode: screen; }
+  .g-slice.b { background: var(--glitch-b); mix-blend-mode: screen; }
+  .g-slice.p { background: #fff; }
+
+  /* ============ 终幕：就绪页 ============ */
+  .scene-ready {
+    position: absolute; inset: 0; z-index: 10; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 26px;
+    background: linear-gradient(160deg, #f7f2e9 0%, var(--paper) 60%, var(--paper-deep) 100%);
+  }
+  .scene-ready.show { display: flex; animation: readyIn 0.7s ease; }
+  @keyframes readyIn { from { opacity: 0; } to { opacity: 1; } }
+  .ready-whale { width: 130px; height: 82px; opacity: 0.9; }
+  .ready-title { font-size: 44px; font-weight: 900; letter-spacing: 0.24em; text-indent: 0.24em; }
+  .ready-title span { color: var(--accent); }
+  .ready-sub { font-size: 13px; letter-spacing: 0.4em; opacity: 0.55; }
+  .replay {
+    margin-top: 18px; font-size: 12px; letter-spacing: 0.3em; text-indent: 0.3em;
+    border: 1px solid var(--ink); background: transparent; color: var(--ink);
+    padding: 10px 26px; cursor: pointer; transition: 0.2s;
+  }
+  .replay:hover { background: var(--ink); color: var(--paper); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 终幕：就绪页 -->
+  <div class="scene-ready" id="sceneReady">
+    <svg aria-hidden="true" class="ready-whale" viewBox="0 0 100 62">
+      <path d="M6 38 C10 20 30 8 52 10 C64 11 72 16 78 24 C82 20 88 16 94 15 C92 21 88 27 82 31 C86 40 80 50 68 53 C50 57 22 54 6 38 Z M30 30 a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0 Z" fill="#141414"/>
+      <path d="M40 42 C48 47 60 47 68 43 C62 51 48 52 40 42 Z" fill="#ff7500"/>
+    </svg>
+    <div class="ready-title">DEEPSEEK<span>·</span>智能体已就绪</div>
+    <div class="ready-sub mono">SYSTEM ONLINE · ALL MODULES NOMINAL</div>
+    <button class="replay" id="btnReplay">重播启动动画</button>
+  </div>
+
+  <!-- 第二幕：档案板 -->
+  <div class="scene-board" id="sceneBoard">
+    <div class="frame-line fl-top"></div>
+    <div class="frame-line fl-bottom"></div>
+
+    <div class="brand">
+      <svg aria-hidden="true" viewBox="0 0 40 40">
+        <path d="M20 2 L36 11 L36 29 L20 38 L4 29 L4 11 Z" fill="#141414"/>
+        <path d="M20 10 L28 15 L28 25 L20 30 L12 25 L12 15 Z" fill="#ff7500"/>
+        <circle cx="20" cy="20" fill="#f3ede3" r="3"/>
+      </svg>
+      <div class="brand-name">
+        <div class="brand-cn">DEEPSEEK</div>
+        <div class="brand-en mono">INTERNAL TERMINAL</div>
+      </div>
+    </div>
+
+    <button class="skip" id="btnSkip">跳过 SKIP [ESC]</button>
+
+    <div class="hud hud-tl mono">RHINE-STYLE ARCHIVE <b>//</b> SEC.07</div>
+    <div class="hud hud-tr mono">ACCESS FLOW <b>//</b> VER 2.1.0</div>
+    <div class="hud hud-bl mono">OPERATOR: <b id="hudOperator">GUEST</b></div>
+    <div class="hud hud-br mono">LAT 31.2304 / LNG 121.4737 · <b>LOCAL</b></div>
+
+    <div class="reticle">
+      <div class="ring"></div>
+      <div class="ring2"></div>
+      <div class="ring3"></div>
+      <div class="tick"></div>
+    </div>
+
+    <div class="readout mono"><span id="pct">000</span>%<small>LOADING PROGRESS</small></div>
+
+    <div class="center-col">
+      <div class="step-cn" id="stepCn"></div>
+      <div class="step-en mono" id="stepEn"></div>
+      <div class="id-card hidden" id="idCard">
+        <div class="id-left">身份资料</div>
+        <div class="id-right mono">
+          <div class="id-row"><span class="k">OPERATOR</span><span class="v" id="idName">DEEPSEEK AGENT</span></div>
+          <div class="id-row"><span class="k">ID NUMBER</span><span class="v" id="idNo">0087</span></div>
+          <div class="id-row"><span class="k">CLEARANCE</span><span class="v hl" id="idLv">LEVEL 3</span></div>
+        </div>
+      </div>
+      <button class="confirm-btn hidden" id="btnConfirm">确认访问</button>
+    </div>
+
+    <div class="stage-bar mono">
+      <div class="stage-node" id="st1"><div class="stage-dot"></div>AUTHORIZATION</div>
+      <div class="stage-link"></div>
+      <div class="stage-node" id="st2"><div class="stage-dot"></div>VERIFY</div>
+    </div>
+
+    <div class="log-area mono" id="logArea"></div>
+  </div>
+
+  <!-- 第一幕：黑幕 -->
+  <div class="scene-black" id="sceneBlack">
+    <svg aria-hidden="true" class="whale-mark" viewBox="0 0 100 62">
+      <path d="M6 38 C10 20 30 8 52 10 C64 11 72 16 78 24 C82 20 88 16 94 15 C92 21 88 27 82 31 C86 40 80 50 68 53 C50 57 22 54 6 38 Z M30 30 a2.6 2.6 0 1 0 5.2 0 a2.6 2.6 0 1 0 -5.2 0 Z" fill="#f3ede3"/>
+      <path d="M40 42 C48 47 60 47 68 43 C62 51 48 52 40 42 Z" fill="#ff7500"/>
+    </svg>
+    <div class="black-caption mono">REQUESTING ACCESS · 正在请求访问</div>
+    <div class="flash" id="flash"></div>
+  </div>
+
+  <!-- 故障揭幕 -->
+  <div class="glitch-mask" id="glitchMask"></div>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const black = $("sceneBlack"), board = $("sceneBoard"), flash = $("flash"),
+        mask = $("glitchMask"), ready = $("sceneReady"),
+        stepCn = $("stepCn"), stepEn = $("stepEn"),
+        idCard = $("idCard"), btnConfirm = $("btnConfirm"),
+        logArea = $("logArea"), pct = $("pct"),
+        st1 = $("st1"), st2 = $("st2"),
+        hudOperator = $("hudOperator");
+
+  let skipFlag = false, typingToken = 0;
+
+  const LOGS = [
+    "初始化终端内核 .................... OK",
+    "载入模型调度模块 deepseek-core ... OK",
+    "校验访问许可 Lic-0087 ............ OK",
+    "同步操作员身份资料 ............... OK",
+    "挂载工具链 / 技能包 .............. OK",
+    "建立安全会话通道 ................. OK",
+  ];
+  const STEP_LOGS = {
+    3: ["接收访问需求 REQ-0x2F ............ "],
+    4: ["开始读取权限表 ACL ............... ", "核验权限等级 LEVEL 3 ............. "],
+  };
+
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  const waitSkip = (ms) => new Promise(r => {
+    const t = setTimeout(r, ms);
+    const chk = setInterval(() => {
+      if (skipFlag) { clearTimeout(t); clearInterval(chk); r(); }
+      if (r.done) clearInterval(chk);
+    }, 60);
+  });
+
+  function typewriter(el, text, speed) {
+    speed = speed || 45;
+    const token = ++typingToken;
+    return new Promise(resolve => {
+      el.textContent = "";
+      let i = 0;
+      (function tick() {
+        if (skipFlag || token !== typingToken) { el.textContent = text; return resolve(); }
+        el.textContent = text.slice(0, ++i);
+        if (i < text.length) setTimeout(tick, speed);
+        else resolve();
+      })();
+    });
+  }
+
+  function pushLog(line, ok) {
+    const div = document.createElement("div");
+    div.className = "log-line" + (ok ? " ok" : "");
+    div.textContent = "> " + line;
+    logArea.appendChild(div);
+    while (logArea.children.length > 7) logArea.removeChild(logArea.firstChild);
+  }
+
+  function setPct(v) {
+    pct.textContent = String(Math.floor(v)).padStart(3, "0");
+  }
+
+  function makeGlitch() {
+    mask.innerHTML = "";
+    const rows = 14;
+    for (let i = 0; i < rows; i++) {
+      ["", "a", "b", "p"].forEach((cls, k) => {
+        const s = document.createElement("div");
+        s.className = "g-slice " + cls;
+        const h = 100 / rows + 1;
+        s.style.top = (i * 100 / rows) + "%";
+        s.style.height = h + "%";
+        s.style.transform = "translateX(" + ((Math.random() - 0.5) * (k === 0 ? 8 : 22)).toFixed(1) + "%)";
+        s.style.animation = "glitchJitter 0.12s steps(2) " + (Math.random() * 4).toFixed(2) + " infinite alternate";
+        mask.appendChild(s);
+      });
+    }
+    const style = document.createElement("style");
+    style.textContent = "@keyframes glitchJitter { to { transform: translateX(" +
+      ((Math.random() - 0.5) * 30).toFixed(1) + "%); } }";
+    mask.appendChild(style);
+    mask.classList.add("go");
+  }
+
+  function confirmOnce() {
+    return new Promise(resolve => {
+      btnConfirm.classList.remove("hidden");
+      const onKey = (e) => {
+        if (e.key === "Enter" || e.key === " ") { cleanup(); resolve(); }
+      };
+      const onClick = () => { cleanup(); resolve(); };
+      function cleanup() {
+        btnConfirm.removeEventListener("click", onClick);
+        window.removeEventListener("keydown", onKey);
+        btnConfirm.classList.add("hidden");
+      }
+      btnConfirm.addEventListener("click", onClick);
+      window.addEventListener("keydown", onKey);
+      if (skipFlag) { cleanup(); resolve(); }
+    });
+  }
+
+  async function play() {
+    // 复位
+    skipFlag = false; typingToken++;
+    ready.classList.remove("show");
+    board.classList.remove("show");
+    black.classList.remove("hide", "play");
+    flash.classList.remove("go");
+    mask.classList.remove("go");
+    mask.innerHTML = "";
+    logArea.innerHTML = "";
+    idCard.classList.add("hidden");
+    btnConfirm.classList.add("hidden");
+    stepCn.textContent = ""; stepEn.textContent = "";
+    st1.classList.remove("active"); st2.classList.remove("active");
+    setPct(0);
+
+    // —— 第一幕：黑幕标识 ——
+    black.style.display = "flex";
+    black.style.opacity = "1";
+    black.style.pointerEvents = "auto";
+    void black.offsetWidth;
+    black.classList.add("play");
+    await waitSkip(2600);
+    if (skipFlag) return finish();
+
+    // 过曝洗白 → 切档案板
+    flash.classList.add("go");
+    await wait(220);
+    board.classList.add("show");
+    black.classList.add("hide");
+    await wait(420);
+    black.style.display = "none";
+    flash.classList.remove("go");
+
+    // —— 第二幕：档案板授权流程 ——
+    // 第 1 步：需要访问许可（等待确认）
+    st1.classList.add("active");
+    pushLog("等待用户授权 ...");
+    typewriter(stepCn, "需要访问许可", 60);
+    await typewriter(stepEn, "ACCESS PERMISSION REQUIRED", 30);
+    await confirmOnce();
+    if (skipFlag) return finish();
+    pushLog("访问许可已授予", true);
+
+    // 第 2 步：身份资料确认（等待确认）
+    typewriter(stepCn, "身份资料确认", 55);
+    await typewriter(stepEn, "IDENTITY VERIFICATION", 26);
+    idCard.classList.remove("hidden");
+    pushLog("读取操作员档案 #0087 ... OK", true);
+    await confirmOnce();
+    if (skipFlag) return finish();
+
+    // 第 3 步：接收访问需求（自动）
+    idCard.classList.add("hidden");
+    typewriter(stepCn, "接收访问需求", 55);
+    typewriter(stepEn, "RECEIVING ACCESS REQUEST", 26);
+    for (let i = 0; i <= 24; i++) { setPct(i * 1.2); await waitSkip(18); }
+    (STEP_LOGS[3] || []).forEach((l, i) => setTimeout(() => pushLog(l + "OK", true), 250 * (i + 1)));
+    await waitSkip(1200);
+    if (skipFlag) return finish();
+
+    // 第 4 步：开始读取权限（自动，读条）
+    st2.classList.add("active");
+    typewriter(stepCn, "开始读取权限", 55);
+    typewriter(stepEn, "READING PERMISSIONS", 26);
+    (STEP_LOGS[4] || []).forEach((l, i) => setTimeout(() => pushLog(l + "OK", true), 400 * (i + 1)));
+    for (let i = 24; i <= 88; i++) { setPct(24 + (i - 24) * (64 / 64)); await waitSkip(22); }
+    await waitSkip(600);
+    if (skipFlag) return finish();
+
+    // 第 5 步：核验通过
+    typewriter(stepCn, "读取完毕 · 核验通过", 50);
+    typewriter(stepEn, "VERIFICATION COMPLETE", 24);
+    for (let i = 88; i <= 100; i++) { setPct(i); await waitSkip(26); }
+    pushLog("全部核验通过，准备进入系统", true);
+    await waitSkip(1400);
+    if (skipFlag) return finish();
+
+    // 第 6 步：欢迎访问
+    stepCn.textContent = "";
+    await typewriter(stepCn, "欢迎访问", 90);
+    typewriter(stepEn, "WELCOME TO DEEPSEEK TERMINAL", 24);
+    pushLog("会话已建立", true);
+    await waitSkip(1800);
+
+    finish();
+  }
+
+  function finish() {
+    skipFlag = true; typingToken++;
+    // 故障揭幕
+    if (board.classList.contains("show")) makeGlitch();
+    setTimeout(() => {
+      board.classList.remove("show");
+      ready.classList.add("show");
+      setTimeout(() => { mask.classList.remove("go"); mask.innerHTML = ""; }, 750);
+    }, board.classList.contains("show") ? 420 : 0);
+  }
+
+  function skipAll() {
+    skipFlag = true; typingToken++;
+    btnConfirm.classList.add("hidden");
+    board.classList.remove("show");
+    black.classList.add("hide");
+    setTimeout(() => { black.style.display = "none"; }, 400);
+    ready.classList.add("show");
+  }
+
+  // 事件
+  $("btnSkip").addEventListener("click", skipAll);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") skipAll();
+  });
+  $("btnReplay").addEventListener("click", play);
+
+  // 自动播放
+  play();
+})();
+</script>
+</body>
+</html>
